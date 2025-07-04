@@ -4,7 +4,6 @@ import { BaseMessage } from '@langchain/core/messages';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { DatabaseService } from '../database/database.service';
-import { MessagesAnnotation } from '@langchain/langgraph';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { Tool } from '@langchain/core/tools';
 
@@ -42,13 +41,6 @@ export class ChatService {
       llm: this.model,
       tools: this.databaseTools,
     });
-  }
-
-  private async callModel(state: typeof MessagesAnnotation.State) {
-    // Bind tools to the model for streaming
-    const modelWithTools = this.model.bindTools(this.databaseTools);
-    const response = await modelWithTools.invoke(state.messages);
-    return { messages: [response] };
   }
 
   async chat(message: string): Promise<{ response: string }> {
