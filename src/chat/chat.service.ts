@@ -1,14 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage } from '@langchain/core/messages';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { DatabaseService } from '../database/database.service';
+import { MessagesAnnotation } from '@langchain/langgraph';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { Tool } from '@langchain/core/tools';
 
 interface AgentResult {
   messages: Array<{
@@ -18,6 +16,8 @@ interface AgentResult {
 
 @Injectable()
 export class ChatService {
+  private model: ChatOpenAI;
+  private databaseTools: Tool[];
   private agent: ReturnType<typeof createReactAgent>;
 
   constructor(
@@ -25,23 +25,30 @@ export class ChatService {
     private databaseService: DatabaseService,
   ) {
     // Get all database tools (SQL + TypeORM)
-    const databaseTools = this.databaseService.getAllTools();
+    this.databaseTools = this.databaseService.getAllTools();
 
     // Model for the agent
-    const model = new ChatOpenAI({
-      temperature: 0.1, // Lower temperature for more consistent agent behavior
-      model: 'qwen3-32b', // Using OpenAI model instead of qwen
+    this.model = new ChatOpenAI({
+      temperature: 0.1,
+      model: 'qwen/qwq-32b',
       openAIApiKey: this.configService.get<string>('OPENAI_API_KEY'),
       configuration: {
         baseURL: 'https://openai.gitflow.ai/v1',
       },
     });
 
-    // Create the agent with tools
+    // Create regular agent for non-streaming
     this.agent = createReactAgent({
-      llm: model,
-      tools: databaseTools,
+      llm: this.model,
+      tools: this.databaseTools,
     });
+  }
+
+  private async callModel(state: typeof MessagesAnnotation.State) {
+    // Bind tools to the model for streaming
+    const modelWithTools = this.model.bindTools(this.databaseTools);
+    const response = await modelWithTools.invoke(state.messages);
+    return { messages: [response] };
   }
 
   async chat(message: string): Promise<{ response: string }> {
@@ -74,64 +81,47 @@ export class ChatService {
     history: BaseMessage[] = [],
     res: Response,
   ): Promise<void> {
-    const systemPrompt =
-      'You are a database assistant. For any question about the contents of the database (such as counts, lists, or details), you must always use the available tools (such as count_rows, list_tables, get_table_info, or query_database) to get the answer. Never guess or make up numbers. If you do not know, use the tools to find out.';
-
+    console.log('history', history);
     try {
       // Send initial thinking message
       res.write(
         `data: ${JSON.stringify({
           type: 'content',
-          content: '🤔 Thinking...',
+          content: '🤔 Processing your request...',
         })}\n\n`,
       );
 
-      // Small delay to show the thinking state
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Send processing message
-      res.write(
-        `data: ${JSON.stringify({
-          type: 'content',
-          content: '🔍 Processing your request...',
-        })}\n\n`,
-      );
-
-      // Get the response using the agent
+      // Use the non-streaming agent to get the complete response with proper tool handling
       const result = (await this.agent.invoke({
         messages: [
-          new SystemMessage(systemPrompt),
-          ...history,
-          new HumanMessage(message),
+          {
+            role: 'user',
+            content: message,
+          },
         ],
       })) as AgentResult;
 
+      // Stream the final response character by character to simulate real streaming
       const lastMessage = result.messages[result.messages.length - 1];
-      const response =
-        typeof lastMessage?.content === 'string'
-          ? lastMessage.content
-          : JSON.stringify(lastMessage?.content || '');
+      const response = lastMessage?.content || '';
+      const finalResponse =
+        typeof response === 'string' ? response : JSON.stringify(response);
 
-      // Send the complete response
-      res.write(
-        `data: ${JSON.stringify({
-          type: 'content',
-          content: response,
-        })}\n\n`,
-      );
-
-      // Send the complete response
-      res.write(
-        `data: ${JSON.stringify({
-          type: 'complete',
-          response: response,
-        })}\n\n`,
-      );
+      // Stream the response character by character
+      for (let i = 0; i < finalResponse.length; i++) {
+        res.write(
+          `data: ${JSON.stringify({
+            type: 'content',
+            content: finalResponse[i],
+          })}\n\n`,
+        );
+      }
 
       // End the stream
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       res.end();
     } catch (error) {
+      console.error('Streaming error:', error);
       res.write(
         `data: ${JSON.stringify({
           type: 'error',
