@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { Order } from './order.entity';
 import { Review } from './review.entity';
+import { UserEvent } from './user-event.entity';
 
 @Entity('users')
 export class User {
@@ -39,4 +40,7 @@ export class User {
 
   @OneToMany(() => Review, (review: Review) => review.user)
   reviews: Review[];
+
+  @OneToMany(() => UserEvent, (event: UserEvent) => event.user)
+  events: UserEvent[];
 }
