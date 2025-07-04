@@ -69,16 +69,17 @@ export class ChatService {
       },
     })
       .addNode('chatbot', async (state: ChatState) => {
-        const messages = state.messages;
-        const response = await this.model.invoke(messages);
+        let messages = state.messages;
+        let response = await this.model.invoke(messages);
         interface ToolCall {
           name: string;
           args?: { input?: string };
           type: string;
           id: string;
         }
-        const toolCalls = (response as { tool_calls?: ToolCall[] }).tool_calls;
-        if (toolCalls && toolCalls.length > 0) {
+        let toolCalls = (response as { tool_calls?: ToolCall[] }).tool_calls;
+        // Multi-step tool chaining loop
+        while (toolCalls && toolCalls.length > 0) {
           const toolCallRaw = toolCalls[0];
           if (toolCallRaw && typeof toolCallRaw.name === 'string') {
             const toolName: string = toolCallRaw.name;
@@ -97,13 +98,14 @@ export class ChatService {
                 tool_call_id: toolCallRaw.id,
                 content: toolResult,
               });
-              // Call the model again with the tool result
-              const finalResponse = await this.model.invoke([
-                ...messages,
-                toolMessage,
-              ]);
-              return { messages: [finalResponse] };
+              messages = [...messages, toolMessage];
+              response = await this.model.invoke(messages);
+              toolCalls = (response as { tool_calls?: ToolCall[] }).tool_calls;
+            } else {
+              break;
             }
+          } else {
+            break;
           }
         }
         // Default: return the model's response as before
