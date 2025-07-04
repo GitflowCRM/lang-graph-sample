@@ -92,8 +92,7 @@ export class ChatController {
     },
   })
   async chat(@Body() chatDto: ChatDto): Promise<ChatResponseDto> {
-    const history = chatDto.history || [];
-    return this.chatService.chat(chatDto.message, history as BaseMessage[]);
+    return this.chatService.chat(chatDto.message);
   }
 
   @Post('stream')
