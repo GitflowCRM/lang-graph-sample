@@ -101,19 +101,6 @@ export class ChatController {
     type: ChatDto,
     description: 'Chat message with optional history',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Streaming chat response',
-    content: {
-      'text/event-stream': {
-        schema: {
-          type: 'string',
-          example:
-            'data: {"type":"content","content":"Hello"}\n\ndata: {"type":"complete","response":"Hello! How can I help you?"}\n\ndata: {"type":"done"}\n\n',
-        },
-      },
-    },
-  })
   async streamChat(
     @Body() chatDto: ChatDto,
     @Res() res: Response,

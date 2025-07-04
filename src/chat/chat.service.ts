@@ -30,7 +30,7 @@ export class ChatService {
     // Model for the agent
     const model = new ChatOpenAI({
       temperature: 0.1, // Lower temperature for more consistent agent behavior
-      model: 'qwen/qwq-32b', // Using OpenAI model instead of qwen
+      model: 'qwen3-32b', // Using OpenAI model instead of qwen
       openAIApiKey: this.configService.get<string>('OPENAI_API_KEY'),
       configuration: {
         baseURL: 'https://openai.gitflow.ai/v1',
@@ -78,6 +78,25 @@ export class ChatService {
       'You are a database assistant. For any question about the contents of the database (such as counts, lists, or details), you must always use the available tools (such as count_rows, list_tables, get_table_info, or query_database) to get the answer. Never guess or make up numbers. If you do not know, use the tools to find out.';
 
     try {
+      // Send initial thinking message
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'content',
+          content: '🤔 Thinking...',
+        })}\n\n`,
+      );
+
+      // Small delay to show the thinking state
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Send processing message
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'content',
+          content: '🔍 Processing your request...',
+        })}\n\n`,
+      );
+
       // Get the response using the agent
       const result = (await this.agent.invoke({
         messages: [
@@ -93,7 +112,7 @@ export class ChatService {
           ? lastMessage.content
           : JSON.stringify(lastMessage?.content || '');
 
-      // Stream the response
+      // Send the complete response
       res.write(
         `data: ${JSON.stringify({
           type: 'content',
