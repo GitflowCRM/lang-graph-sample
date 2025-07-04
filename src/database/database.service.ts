@@ -10,6 +10,9 @@ import {
   GetSampleDataTool,
   GetProductAnalyticsTool,
   GetOrderSummaryTool,
+  GetDatabaseSchemaTool,
+  CountRowsTool,
+  GetRowWithExtremeValueTool,
   SayAlohaTool,
 } from './sql.tools';
 import {
@@ -156,6 +159,9 @@ export class DatabaseService implements OnModuleDestroy {
       new GetSampleDataTool(this),
       new GetProductAnalyticsTool(this),
       new GetOrderSummaryTool(this),
+      new GetDatabaseSchemaTool(this),
+      new CountRowsTool(this),
+      new GetRowWithExtremeValueTool(this),
       new SayAlohaTool(),
       // TypeORM Tools
       new GetUsersTool(this),

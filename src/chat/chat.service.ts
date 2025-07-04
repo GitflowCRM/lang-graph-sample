@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
-import { BaseMessage, HumanMessage } from '@langchain/core/messages';
+import {
+  BaseMessage,
+  HumanMessage,
+  SystemMessage,
+  ToolMessage,
+} from '@langchain/core/messages';
 import { StateGraph, END } from '@langchain/langgraph';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
@@ -28,8 +33,8 @@ export class ChatService {
     // Model for regular chat (optimized for accuracy) with database tools
     const baseModel = new ChatOpenAI({
       temperature: 0.1, // Lower temperature for more consistent agent behavior
-      // model: 'qwen/qwq-32b', // Command R model for better reasoning
-      model: 'c4ai-command-r-v01',
+      model: 'qwen/qwq-32b', // Command R model for better reasoning
+      // model: 'c4ai-command-r-v01',
       openAIApiKey: this.configService.get<string>('OPENAI_API_KEY'),
       configuration: {
         baseURL: 'https://openai.gitflow.ai/v1',
@@ -41,8 +46,8 @@ export class ChatService {
     // Model for streaming (optimized for speed) with database tools
     const streamBaseModel = new ChatOpenAI({
       temperature: 0.3, // Slightly higher for more natural streaming responses
-      // model: 'qwen/qwq-32b', // Smaller, faster model for streaming
-      model: 'c4ai-command-r-v01',
+      model: 'qwen/qwq-32b', // Smaller, faster model for streaming
+      // model: 'c4ai-command-r-v01',
       openAIApiKey: this.configService.get<string>('OPENAI_API_KEY'),
       configuration: {
         baseURL: 'https://openai.gitflow.ai/v1',
@@ -64,8 +69,8 @@ export class ChatService {
       },
     })
       .addNode('chatbot', async (state: ChatState) => {
-        const response = await this.model.invoke(state.messages);
-        // Check for tool calls in the response
+        const messages = state.messages;
+        const response = await this.model.invoke(messages);
         interface ToolCall {
           name: string;
           args?: { input?: string };
@@ -88,14 +93,16 @@ export class ChatService {
               );
             if (tool) {
               const toolResult = await tool._call(toolArgs.input ?? '');
-              return {
-                messages: [
-                  {
-                    content: toolResult,
-                    role: 'assistant',
-                  },
-                ],
-              };
+              const toolMessage = new ToolMessage({
+                tool_call_id: toolCallRaw.id,
+                content: toolResult,
+              });
+              // Call the model again with the tool result
+              const finalResponse = await this.model.invoke([
+                ...messages,
+                toolMessage,
+              ]);
+              return { messages: [finalResponse] };
             }
           }
         }
@@ -111,8 +118,21 @@ export class ChatService {
     message: string,
     history: BaseMessage[] = [],
   ): Promise<{ response: string; followUp?: string }> {
+    return this.invokeWorkflow(message, history);
+  }
+
+  private async invokeWorkflow(
+    message: string,
+    history: BaseMessage[] = [],
+  ): Promise<{ response: string; followUp?: string }> {
+    const systemPrompt =
+      'You are a database assistant. For any question about the contents of the database (such as counts, lists, or details), you must always use the available tools (such as count_rows, list_tables, get_table_info, or query_database) to get the answer. Never guess or make up numbers. If you do not know, use the tools to find out.';
     const initialState: ChatState = {
-      messages: [...history, new HumanMessage(message)],
+      messages: [
+        new SystemMessage(systemPrompt),
+        ...history,
+        new HumanMessage(message),
+      ],
     };
 
     const result = (await this.workflow.invoke(initialState)) as ChatState;
@@ -131,38 +151,42 @@ export class ChatService {
     history: BaseMessage[] = [],
     res: Response,
   ): Promise<void> {
+    const systemPrompt =
+      'You are a database assistant. For any question about the contents of the database (such as counts, lists, or details), you must always use the available tools (such as count_rows, list_tables, get_table_info, or query_database) to get the answer. Never guess or make up numbers. If you do not know, use the tools to find out.';
     const initialState: ChatState = {
-      messages: [...history, new HumanMessage(message)],
+      messages: [
+        new SystemMessage(systemPrompt),
+        ...history,
+        new HumanMessage(message),
+      ],
     };
 
     try {
-      // Stream the main response using the streaming model
-      const stream = await this.streamModel.stream(initialState.messages);
+      // 1. Get the initial response (non-streaming, to check for tool calls)
+      const result = (await this.workflow.invoke(initialState)) as ChatState;
+      const lastMessage = result.messages[result.messages.length - 1];
+      const response =
+        typeof lastMessage.content === 'string'
+          ? lastMessage.content
+          : JSON.stringify(lastMessage.content);
 
-      let fullResponse = '';
-
-      for await (const chunk of stream) {
-        const content = chunk.content;
-        if (typeof content === 'string' && content) {
-          fullResponse += content;
-          res.write(
-            `data: ${JSON.stringify({
-              type: 'content',
-              content: content,
-            })}\n\n`,
-          );
-        }
-      }
-
-      // Send the complete response
+      // 2. Stream the response as if it were a streaming chunk
       res.write(
         `data: ${JSON.stringify({
-          type: 'complete',
-          response: fullResponse,
+          type: 'content',
+          content: response,
         })}\n\n`,
       );
 
-      // End the stream
+      // 3. Send the complete response
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'complete',
+          response: response,
+        })}\n\n`,
+      );
+
+      // 4. End the stream
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       res.end();
     } catch (error) {
