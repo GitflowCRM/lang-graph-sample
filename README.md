@@ -1,99 +1,114 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# LangChain + LangGraph Chatbot
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A full-stack chatbot built with NestJS, LangChain, LangGraph, and OpenAI-compatible models. Features:
+- Natural language chat with LLMs
+- Database integration (PostgreSQL, TypeORM)
+- Tool calling (SQL, analytics, custom tools)
+- Streaming and non-streaming endpoints
+- Swagger API docs
+- Docker Compose for local dev
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Features
+- **Chat with LLMs**: Uses OpenAI-compatible models (e.g., Qwen, Command R)
+- **Database Tools**: Query, list, and analyze data from a Postgres database
+- **Custom Tools**: Easily add new tools (e.g., `say_aloha`)
+- **Streaming Support**: Real-time responses via SSE
+- **Swagger Docs**: Interactive API documentation
+- **TypeORM**: Type-safe database access
+- **LangGraph**: Workflow orchestration and tool chaining
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Quick Start
 
+### 1. Clone & Install
 ```bash
-$ npm install
+git clone <repo-url>
+cd langchain-chatbot
+bun install
 ```
 
-## Compile and run the project
-
+### 2. Start Database
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker-compose up -d
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+### 3. Configure Environment
+Create a `.env` file:
+```
+OPENAI_API_KEY=your_openai_api_key_here
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=langchain_chatbot
+DB_USER=langchain_user
+DB_PASSWORD=langchain_password
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
+### 4. Start the App
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+bun run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## API Usage
 
-Check out a few resources that may come in handy when working with NestJS:
+### Chat Endpoint
+```bash
+curl -X POST http://localhost:3000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "List all products in the database."}'
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Streaming Chat
+```bash
+curl -N -X POST http://localhost:3000/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Show me product analytics."}'
+```
 
-## Support
+### Swagger Docs
+Visit [http://localhost:3000/api](http://localhost:3000/api)
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+## Tools Available
+- `query_database` — Run raw SQL
+- `list_tables` — List all tables
+- `get_table_info` — Table schema
+- `get_sample_data` — Table preview
+- `get_product_analytics` — Analytics view
+- `get_order_summary` — Orders view
+- `get_users`, `get_products`, `get_orders`, `get_reviews` — TypeORM repo tools
+- `search_products` — Filter/search products
+- `say_aloha` — Returns a friendly greeting (for tool chaining test)
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
+
+## Project Structure
+```
+src/
+  chat/         # Chat controller/service
+  database/     # DB service, entities, tools
+  ...
+```
+
+---
+
+## Development
+- **Add new tools**: Implement a class extending `Tool` and add to `getAllTools()`
+- **Add new endpoints**: Use NestJS controllers
+- **Change models**: Update in `chat.service.ts`
+- **Migrations**: Use TypeORM CLI
+
+---
+
+## Credits
+- Built with [NestJS](https://nestjs.com/), [LangChain](https://js.langchain.com/), [LangGraph](https://js.langchain.com/docs/langgraph), [TypeORM](https://typeorm.io/), [OpenAI-compatible LLMs](https://platform.openai.com/docs/models)
+
+---
 
 ## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-# lang-graph-sample
+MIT
